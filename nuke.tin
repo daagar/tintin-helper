@@ -7,7 +7,7 @@
 #nop -- IMPORTANT NOTE for Windows users
 #nop -- use C:/path/to/whatever (note forward slashes)
 
-#var ttd /Users/annli/ryan/tintin/tintin-helper
+#var ttd /home/edgecase/nukefire/tintin-helper
 #var lib $ttd/lib
 #var mod $ttd/modules
 #var db $ttd/db

@@ -74,7 +74,7 @@ Commands:\n
 
 #alias event_eval
 {
-  #alias _event_tmp_ali {%1};
+  #alias _event_tmp_ali {%1;#nop %%0};
   _event_tmp_ali %2;
   #alias _event_tmp_ali #nop;
 }

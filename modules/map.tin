@@ -2,7 +2,7 @@
 #nop Class Definitions
 #nop --
 
-#var map-description {description}
+#var map-description {Walter's Auto-Mapper}
 #var map-help {help file}
 #var map-register-delay 3
 
@@ -39,17 +39,22 @@
 	}
 }
 
+event_register roomLook map {get_room_info {%2} {%3} {%4}}
+event_register endRoomLook generate_room_info {generate_room_info}
+event_register updateExits map {clear_exits}
+
 #nop -- ---------------------------------------------------------------
 #nop -- Variables
 #nop -- ---------------------------------------------------------------
 
-#var mapfile $db/nukefire/msdp.map
+#var mapfile msdp2.map
 
 #map create 100000;
 #map flag nofollow;
 #map flag vtmap on;
 #map flag static;
-#map flag blockgraphics on;
+#map flag blockgraphics off;
+#map flag asciigraphics on;
 #map read $mapfile
 
 #map terrain {Forest} {<228>⟑} DENSE WIDE
@@ -65,59 +70,174 @@
 #nop -- Aliases
 #nop -- ---------------------------------------------------------------
 
+#EVENT {VARIABLE UPDATED MSDP_ROOM_VNUM} { mapRoom }
+#EVENT {SCREEN RESIZE} { map_init }
+
+#alias map_init {
+	#split 0 1 0 45;
+	#map flag vtmap on;	
+	#math map_left {@term_width{} - 45 + 2};
+	#map offset 1 ${map_left} 17 @term_width{};
+}
 
 #alias mapRoom {
+    #nop Available vars: $MSDP_ROOM_VNUM $MSDP_ROOM_EXITS $MSDP_AREA_NAME $MSDP_ROOM_NAME $MSDP_TERRAIN;
+
 	#map goto {$MSDP_ROOM_VNUM} {dig};
 	#map set roomarea $MSDP_AREA_NAME;
 	#map set roomname $MSDP_ROOM_NAME;
-	#map set roomterrain @strip_ansi{$MSDP_ROOM_TERRAIN};
+	#map set roomterrain $MSDP_TERRAIN;
 	#map set roomcolor <178>;
 
 	#if {@mapZoneBlacklist{$MSDP_AREA_NAME}} {#return};
 
-	#foreach {north;south;east;west;up;down} {EXIT} {
+    #nop Create room for all exist and rem wrongly linked room;
+    #nop check each direction;
+    #show *** Update map room: $MSDP_ROOM_VNUM ***;
+    #map at $MSDP_ROOM_VNUM {
+            
+        #map get {roomexits} {MAP_EXIT_LIST};
 
-		#if {&MSDP_ROOM_EXITS[$EXIT]} {
-			#map get {roomexits} {EXIT_LIST};
-			#if {&EXIT_LIST[$EXIT] == 0}
-			{
-				#map get {roomvnum} {EXIT_VNUM} {$MSDP_ROOM_EXITS[$EXIT]};
-				#if {("$MSDP_ROOM_EXITS[$EXIT]" != "?") &&
-					("$MSDP_ROOM_EXITS[$EXIT]" != "L") &&
-					("$MSDP_ROOM_EXITS[$EXIT]" != "C")} {
-					#map dig {@dA{$EXIT}} {$MSDP_ROOM_EXITS[$EXIT]};
-				};
-				#if {$EXIT_VNUM == 0}
-				{
-					#map set {roomcolor} {<118>} {$MSDP_ROOM_EXITS[$EXIT]}
-				}
-			};
-		};
-		#else {
-			#nop -- Room exit doesn't exist, delete;
-			#map get {roomexits} {EXIT_LIST};
-			#if {&EXIT_LIST[$EXIT] != 0} {
-				#map delete $EXIT
-			};
-		}
+        #foreach {north;south;east;west;up;down} {EXIT} {
+            #regexp {$MSDP_ROOM_EXITS} {$EXIT=%d} {
 
-	};
-	#map write $mapfile
+                #if {&MAP_EXIT_LIST[@dA{$EXIT}] == 0}
+                {
+                    #nop linked room NOT exist;
+                    #map get {roomvnum} {EXIT_VNUM} {&1};
+                    #map dig {@dA{$EXIT}} {&1};
+                    #if {$EXIT_VNUM == 0}
+                    {
+                        #map set {roomcolor} {<118>} {&1}
+                    }
+
+                }
+
+            } {
+                #map get {roomexits} {EXIT_LIST};
+                #if {&EXIT_LIST[@dA{$EXIT}] != 0} {
+                    #map delete @dA{$EXIT};
+                };
+            };
+        };
+
+    };
 }
+
+#nop -- generate formatted line for room info block
+#alias generate_room_info {
+	#nop %0;
+	#var _ex_line {};
+	#list exit_info create {<Ff0d5a1>Exits :};
+	#foreach {North;East;South;West;Up;Down} {_x} {
+		#if {&{room[exits][$_x]}} {
+			diaLog map Exit for $_x exists;
+			#format _ex_line {<Ff0d5a1>%.1s : <Ffcfcfc>%s}
+			{$_x}
+			{$room[exits][$_x]};
+			#list exit_info add ${_ex_line}
+		};
+		diaLog map exit line="$_ex_line";
+	};
+
+	#list room_info create {<Ff0d5a1>Location info:};
+
+	#format _rname {<Ff0d5a1>Room  : <Ffff>%s} {$room[name]};
+	#list room_info add $_rname;
+	#format _sector {<Ff0d5a1>Sector: <Ffcfcfc>%s} {$room[sector]};
+	#list room_info add ${_sector};
+	#if {@is_alias{display_bottom_left_info}} {display_bottom_left_info};
+	#nop #if {@is_alias{display_left_tiles}} {display_left_tiles}
+}
+
+#nop -- set room info to first left tile
+#alias init_room_info {
+	#nop set_left_tile 9 <B373b41> _room_line 16 box;
+	set_bottom_left_info 1 <B373b41> room_info 3;
+	set_bottom_left_info 2 <B373b41> exit_info 7;
+	generate_room_info
+}
+
+#alias get_room_info {
+	#nop %0;
+	diaLog map room_info called;
+	#var room[name] %1;
+	#var room[time] %2;
+	#var room[sector] %3;
+	#var room[looking] 1;
+	#var room[desc] {};
+}
+
+#alias end_room_look {
+	#nop %0;
+	#if {$room[looking]==1} {
+		event_raise endRoomLook;
+		diaLog map endRoomLook
+	}
+}
+
+#alias clear_exits {
+	#nop %0;
+	#unvar room[exits];
+	diaLog map clearing exits;
+}
+
+#alias end_exits {
+	#nop %0;
+	#if {$update_exits == 1} {
+		#var update_exits 0;
+		#nop #var room[exits] $exits;
+		#nop event_raise drawExits
+	}
+}
+
+mapRoom
+
 
 #nop -- ---------------------------------------------------------------
 #nop -- Actions
 #nop -- ---------------------------------------------------------------
+#action {Obvious exits:$} {
+	diaLog map update exits;
+	event_raise updateExits;
+	#nop #unvar exits;
+	#var update_exits 1
+}
+
+#action {^{North|East|South|West|Up|Down}%s- %2} {
+	#if {$update_exits==1} {
+		#var room[exits][%1] %2;
+		diaLog map setting exit %1 to %2;
+	}
+} {4}
+
+#action {^%1 - [%2] [%3]} {
+	event_raise roomLook {%1} {%2} {%3};
+	#echo {Calling roomLook event with {%1} {%2} {%3}};
+	diaLog map Looking at room
+} {4}
+
+#action {^%1 - [%2]} {
+	event_raise roomLook {%1} {--} {%2};
+	#echo {Calling roomLook event with {%1} {--} {%2}};
+	diaLog map Looking at room
+} {5}
 
 #nop -- ---------------------------------------------------------------
 #nop -- Events
 #nop -- ---------------------------------------------------------------
-#event {SESSION DISCONNECTED} {#map write $db/msdp.map}
+#event {SESSION DISCONNECTED} {#map write msdp2.map}
 
 
 #nop -- ---------------------------------------------------------------
 #nop -- Functions
 #nop -- ---------------------------------------------------------------
+
+#function term_width {
+	#screen get cols _scr_wid;
+	#return $_scr_wid
+}
+
 #function dA {
     #if {"%1" == "east"} {#var result e};
     #elseif {"%1" == "west"} {#var result w};
@@ -128,8 +248,19 @@
     #else {#var result %1};
 }
 
+
+
 #function mapZoneBlacklist {
 	#list mapZoneBlacklist find {%0} {result}
 }
+
+init_room
+
+#high {^North -%1$} {Orange}
+#high {^East  -%1$} {Magenta}
+#high {^South -%1$} {Violet}
+#high {^West  -%1$} {Cyan}
+#high {^Up    -%1$} {Tan}
+#high {^Down  -%1$} {Yellow}
 
 #nop -- vim: syntax=tt

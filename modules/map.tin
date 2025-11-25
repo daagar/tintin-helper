@@ -1,6 +1,8 @@
 #nop --
 #nop Class Definitions
 #nop --
+#class map {kill}
+#class map {open}
 
 #var map-description {Walter's Auto-Mapper}
 #var map-help {help file}
@@ -33,9 +35,12 @@
 		#class map kill
 	};
 	#else {
-		#map goto {${MSDP_ROOM_VNUM}} {dig};
+		#read db/last_room.db;
+		#var MSDP_ROOM_VNUM $last_room;
+		#map goto {$MSDP_ROOM_VNUM} {dig};
 		register_module map;
 		layout_init;
+		#send look;
 	}
 }
 
@@ -70,8 +75,8 @@ event_register updateExits map {clear_exits}
 #nop -- Aliases
 #nop -- ---------------------------------------------------------------
 
-#EVENT {VARIABLE UPDATED MSDP_ROOM_VNUM} { mapRoom }
-#EVENT {SCREEN RESIZE} { map_init }
+#nop #EVENT {VARIABLE UPDATED MSDP_TERRAIN} { #var CURRENT_TERRAIN $MSDP_TERRAIN }
+#nop #EVENT {SCREEN RESIZE} { layout_init; map_init }
 
 #alias map_init {
 	#split 0 1 0 45;
@@ -86,7 +91,7 @@ event_register updateExits map {clear_exits}
 	#map goto {$MSDP_ROOM_VNUM} {dig};
 	#map set roomarea $MSDP_AREA_NAME;
 	#map set roomname $MSDP_ROOM_NAME;
-	#map set roomterrain $MSDP_TERRAIN;
+	#nop #delay 0.5 {#map set roomterrain $CURRENT_TERRAIN};
 	#map set roomcolor <178>;
 
 	#if {@mapZoneBlacklist{$MSDP_AREA_NAME}} {#return};
@@ -146,6 +151,8 @@ event_register updateExits map {clear_exits}
 	#list room_info add $_rname;
 	#format _sector {<Ff0d5a1>Sector: <Ffcfcfc>%s} {$room[sector]};
 	#list room_info add ${_sector};
+	#format _terrain {<Ff0d5a1>Terrain: <Ffcfcfc>%s} {$room[terrain]};
+	#list room_info add ${_terrain};
 	#if {@is_alias{display_bottom_left_info}} {display_bottom_left_info};
 	#nop #if {@is_alias{display_left_tiles}} {display_left_tiles}
 }
@@ -153,7 +160,7 @@ event_register updateExits map {clear_exits}
 #nop -- set room info to first left tile
 #alias init_room_info {
 	#nop set_left_tile 9 <B373b41> _room_line 16 box;
-	set_bottom_left_info 1 <B373b41> room_info 3;
+	set_bottom_left_info 1 <B373b41> room_info 4;
 	set_bottom_left_info 2 <B373b41> exit_info 7;
 	generate_room_info
 }
@@ -163,7 +170,8 @@ event_register updateExits map {clear_exits}
 	diaLog map room_info called;
 	#var room[name] %1;
 	#var room[time] %2;
-	#var room[sector] %3;
+	#var room[sector] $MSDP_AREA_NAME;
+	#var room[terrain] $MSDP_TERRAIN;
 	#var room[looking] 1;
 	#var room[desc] {};
 }
@@ -191,8 +199,9 @@ event_register updateExits map {clear_exits}
 	}
 }
 
-mapRoom
-
+#alias /mapvh {
+	#map insert %1 {void;hide}
+}
 
 #nop -- ---------------------------------------------------------------
 #nop -- Actions
@@ -214,19 +223,20 @@ mapRoom
 #action {^%1 - [%2] [%3]} {
 	event_raise roomLook {%1} {%2} {%3};
 	#echo {Calling roomLook event with {%1} {%2} {%3}};
+	#map set roomterrain $MSDP_TERRAIN;
 	diaLog map Looking at room
 } {4}
 
 #action {^%1 - [%2]} {
 	event_raise roomLook {%1} {--} {%2};
-	#echo {Calling roomLook event with {%1} {--} {%2}};
-	diaLog map Looking at room
+	#map set roomterrain $MSDP_TERRAIN;
+	diaLog map Looking at room (no weather)
 } {5}
 
 #nop -- ---------------------------------------------------------------
 #nop -- Events
 #nop -- ---------------------------------------------------------------
-#event {SESSION DISCONNECTED} {#map write msdp2.map}
+#event {SESSION DISCONNECTED} {#map write msdp2.map; #system {echo "#var last_room $MSDP_ROOM_VNUM" > db/last_room.db}}
 
 
 #nop -- ---------------------------------------------------------------
@@ -254,13 +264,19 @@ mapRoom
 	#list mapZoneBlacklist find {%0} {result}
 }
 
-init_room
-
 #high {^North -%1$} {Orange}
 #high {^East  -%1$} {Magenta}
 #high {^South -%1$} {Violet}
 #high {^West  -%1$} {Cyan}
 #high {^Up    -%1$} {Tan}
 #high {^Down  -%1$} {Yellow}
+
+#nop -- ---------------------------------------------------------------
+#nop -- Initializers
+#nop -- ---------------------------------------------------------------
+mapRoom
+init_room_info
+
+#class map {close}
 
 #nop -- vim: syntax=tt

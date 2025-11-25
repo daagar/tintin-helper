@@ -132,7 +132,7 @@ but no user interaction is needed.  Data is stored in MSDP_%*.
 			MSDP_REPORT
 		};
 		#nop Wait for terrain instead of vnum, based on order sent by the mud;
-        #case {"TERRAIN"}
+        #case {"ROOM_VNUM"}
         {
 			#nop need to handle this differently with an event;
             #if {@isloaded{map}} {mapRoom};

@@ -72,6 +72,7 @@ event_register enter_world nukefire {post_connect_load login}
 	#foreach {diag;position;combat;nuke_func;inventory;retrieve;track;money;status;exp;multidisplay;players} tmp {
 		load_module nukefire/$tmp
 	};
+	load_module map;
 	#line oneshot #tick {clear} {#buffer end} {0.5};
 	#if {@is_alias{player_setup}} {player_setup %1};
 }
@@ -158,7 +159,7 @@ event_register enter_world nukefire {post_connect_load login}
 	event_raise enter_world
 }
 
-#action {^/// } {
+#action {^///         offend you. If you don't like it, QUIT now!!          ///} {
 	event_raise enter_world
 }
 
